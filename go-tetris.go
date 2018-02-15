@@ -7,6 +7,7 @@ import (
 	"os"
 	"math/rand"
 	"time"
+	"golang.org/x/tools/go/gcimporter15/testdata"
 )
 
 const fps = 10
@@ -14,6 +15,7 @@ const fps = 10
 // Termloop stuff
 var game *tl.Game
 var score *Score
+var playerlevel int
 
 func gameOverScreen() {
 	e := NewGameOver()
@@ -43,13 +45,17 @@ func gameScreen() {
 	game.Screen().SetLevel(level)
 
 	// Create playfield
-	area := NewGameArea()
+	bottom := NewBorder(0, 10, 21, 1, tl.ColorBlue)
+	left := NewBorder(-10, 0, 1, 22, tl.ColorBlue)
+	right := NewBorder(+10, 0, 1, 22, tl.ColorBlue)
 
 
 	// Create score
 	score = NewScore()
 
-	level.AddEntity(area)
+	level.AddEntity(bottom)
+	level.AddEntity(left)
+	level.AddEntity(right)
 	game.Screen().AddEntity(score)
 }
 
@@ -69,6 +75,7 @@ func main() {
 	defer writer.Flush()
 
 	// Game setup
+	playerlevel = 0
 	game = tl.NewGame()
 	game.Screen().SetFps(fps)
 	startScreen()
