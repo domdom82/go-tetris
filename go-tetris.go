@@ -7,7 +7,6 @@ import (
 	"os"
 	"math/rand"
 	"time"
-	"golang.org/x/tools/go/gcimporter15/testdata"
 )
 
 const fps = 10
@@ -37,25 +36,25 @@ func startScreen() {
 	level.AddEntity(e)
 }
 
+
 func gameScreen() {
-	level := tl.NewBaseLevel(tl.Cell{
+	level := NewLevel(tl.Cell{
 		Bg: tl.ColorBlack,
 		Fg: tl.ColorBlack,
 	})
 	game.Screen().SetLevel(level)
 
-	// Create playfield
-	bottom := NewBorder(0, 10, 21, 1, tl.ColorBlue)
-	left := NewBorder(-10, 0, 1, 22, tl.ColorBlue)
-	right := NewBorder(+10, 0, 1, 22, tl.ColorBlue)
+	// Create playing field
+	gameArea := NewGameArea()
 
+	// Create first tile
+	tile := NewTile(gameArea)
 
 	// Create score
 	score = NewScore()
 
-	level.AddEntity(bottom)
-	level.AddEntity(left)
-	level.AddEntity(right)
+	gameArea.AddToLevel(level)
+	tile.AddToLevel(level)
 	game.Screen().AddEntity(score)
 }
 

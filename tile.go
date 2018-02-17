@@ -3,7 +3,6 @@ package main
 import (
 	tl "github.com/JoelOtter/termloop"
 	"math/rand"
-	"golang.org/x/tools/refactor/rename"
 )
 
 
@@ -15,8 +14,10 @@ const (
 	LONG Type = iota
 	SQUARE
 	T
-	SQUIGGLY_LEFT
-	SQUIGGLY_RIGHT
+	Z_LEFT
+	Z_RIGHT
+	L_LEFT
+	L_RIGHT
 )
 
 // A tile consists of 4 parts, each of which can be a block or nil
@@ -24,53 +25,95 @@ const (
 // It is also itself an Entity just for wiring up the keyboard controls and base position
 type Tile struct {
 	*tl.Entity
+	gameArea *GameArea
 	part1 *Block
 	part2 *Block
 	part3 *Block
 	part4 *Block
 	delay int
+	delayCounter int
+	invisibleCounter int
 	tileType Type
+	movable bool
+	invisible bool
 	rotation int
+	x int
+	y int
+	prevX int
+	prevY int
 }
 
+func (tile *Tile) move(x int, y int) {
+	if tile.movable {
+		tile.SetPosition(x,y)
+		xabs,yabs := tile.Entity.Position()
+		tile.part1.SetPosition(xabs+tile.part1.xoffset, yabs+tile.part1.yoffset)
+		tile.part2.SetPosition(xabs+tile.part2.xoffset, yabs+tile.part2.yoffset)
+		tile.part3.SetPosition(xabs+tile.part3.xoffset, yabs+tile.part3.yoffset)
+		tile.part4.SetPosition(xabs+tile.part4.xoffset, yabs+tile.part4.yoffset)
+	}
+}
+
+func (tile *Tile) resetDelay() {
+	tile.delayCounter = tile.delay
+}
+
+func (tile *Tile) resetPosition() {
+	tile.move(tile.prevX, tile.prevY)
+}
+
+func (tile *Tile) SetPosition(x int, y int) {
+	// Set position relative to game area
+	xArea,yArea := tile.gameArea.Position()
+	tile.x = x
+	tile.y = y
+	tile.Entity.SetPosition(x + xArea, y + yArea)
+}
+
+func (tile *Tile) Position() (int,int){
+	// Return position relative to game area
+	return tile.x,tile.y
+}
 
 // Tick for a tile
 func (tile *Tile) Tick(event tl.Event) {
+	x,y := tile.Position()
+	tile.prevX = x
+	tile.prevY = y
+
+	if tile.invisible == true {
+		tile.invisibleCounter--
+		if tile.invisibleCounter <= 0 {
+			tile.invisible = false
+		}
+	}
+
+	if tile.movable == true {
+		tile.delayCounter--
+		if tile.delayCounter <= 0 {
+			tile.resetDelay()
+			y++
+		}
+	}
+
 	if event.Type == tl.EventKey { // Is it a keyboard event?
-		x,y := tile.Position()
 		switch event.Key { // If so, switch on the pressed key.
 		case tl.KeyArrowRight:
-			tile.SetPosition(x+2,y)
+			x+=2
 		case tl.KeyArrowLeft:
-			tile.SetPosition(x-2,y)
+			x-=2
 		case tl.KeyArrowUp:
 			tile.rotate()
 		case tl.KeyArrowDown:
-			tile.SetPosition(x,y+1)
+			y++
+			tile.resetDelay()
 		case tl.KeySpace:
-			//TESTING
-			//food.Reset()
+			tile.delay = 1 //drop tile
+			tile.resetDelay()
 		}
 	}
-}
 
-// Draw for a tile
-func (tile *Tile) Draw(screen *tl.Screen) {
-	x,y := tile.Position()
-
-	tile.delay--
-
-	if tile.delay <= 0 {
-		tile.delay = baseDelay - playerlevel
-		y++
-	}
-
-	tile.SetPosition(x,y)
-	tile.part1.SetPosition(x+tile.part1.xoffset, y+tile.part1.yoffset)
-	tile.part2.SetPosition(x+tile.part2.xoffset, y+tile.part2.yoffset)
-	tile.part3.SetPosition(x+tile.part3.xoffset, y+tile.part3.yoffset)
-	tile.part4.SetPosition(x+tile.part4.xoffset, y+tile.part4.yoffset)
-
+	tile.move(x,y)
 }
 
 func (tile *Tile) rotate() {
@@ -79,50 +122,53 @@ func (tile *Tile) rotate() {
 	//tbd adjust part offsets based on rotation and type
 }
 
-func (tile *Tile) Collide(collision tl.Physical) {
-	switch collision.(type) {
-	//case *Food:
-	//	f := collision.(*Food)
-	//	score.updateScore(f.score * len(snake.body))
-	//	snake.grow = 5
-		//f.Reset(snake)
-	}
-}
-
 func (tile *Tile) AddToLevel(level tl.Level) {
+	level.AddEntity(tile)
 	level.AddEntity(tile.part1)
 	level.AddEntity(tile.part2)
 	level.AddEntity(tile.part3)
 	level.AddEntity(tile.part4)
 }
 
-func NewTile() *Tile {
+func NewTile(area *GameArea) *Tile {
 	t := new(Tile)
+	t.gameArea = area
 	t.Entity = tl.NewEntity(1, 1, 1, 1)
-
-
-
+	areaWidth,_ := area.Size()
+	var xoff,yoff int
 	//Choose random tile
-	choice := rand.Intn(4)
+	choice := rand.Intn(7)
+	//DEBUG
+	choice = 0
 	switch choice {
 	case 0:
-		// long piece
 		t.tileType = LONG
+		t.part1 = NewBlock(t, 0, 0)
+		t.part2 = NewBlock(t, 0, 1)
+		t.part3 = NewBlock(t, 0, 2)
+		t.part4 = NewBlock(t, 0, 3)
+		xoff = areaWidth / 2
+		yoff = -2
 	case 1:
-		// square
 		t.tileType = SQUARE
 	case 2:
-		// t-piece
 		t.tileType = T
 	case 3:
-		// squiggly left
-		t.tileType = SQUIGGLY_LEFT
+		t.tileType = Z_LEFT
 	case 4:
-		// squiggly right
-		t.tileType = SQUIGGLY_RIGHT
+		t.tileType = Z_RIGHT
+	case 5:
+		t.tileType = L_LEFT
+	case 6:
+		t.tileType = L_RIGHT
 	}
 
 	t.delay = baseDelay - playerlevel
+	t.delayCounter = t.delay
+	t.invisibleCounter = 1
 	t.rotation = 0
+	t.movable = true
+	t.invisible = true
+	t.move(xoff,yoff)
 	return t
 }
